@@ -1,0 +1,62 @@
+int midiVal[6] = {0, 0, 0, 0, 0, 0};     // Our data on our 6 channels
+int midiValPrev[6] = {0, 0, 0, 0, 0, 0}; // Our previous data so we know if our data has changed
+
+void setup() {
+  pinMode(3, INPUT_PULLUP); // My switch is on pin 3. It shorts to GND or it's open 
+                            //  so the pullup will set pin 3 high when that switch is open
+  Serial.begin(31250);      // MIDI rate. Final upload must be with this baud rate.
+  // Serial.begin(57600);   // Uncomment for debugging
+}
+
+void loop() {
+
+  // Uncomment to see your raw data values
+//  Serial.print("A0 = ");
+//  Serial.print(midiVal[0]);
+//  Serial.print("  A1 = ");
+//  Serial.print(midiVal[1]);
+//  Serial.print("  A5 = ");
+//  Serial.print(midiVal[2]);
+//  Serial.print("  A6 = ");
+//  Serial.print(midiVal[3]);
+//  Serial.print("  A7 = ");
+//  Serial.print(midiVal[4]);
+//  Serial.print("  D3 = ");
+//  Serial.println(midiVal[5]);
+//  delay(100);
+
+  // Map each value based on the raw data min/max readings for each input.
+  midiVal[0] = max(0, min(127, map(analogRead(0), 0, 771, 0, 127)));
+  midiVal[1] = max(0, min(127, map(analogRead(1), 663, 0, 0, 127)));
+  midiVal[2] = max(0, min(127, map(analogRead(5), 0, 695, 0, 127)));
+  midiVal[3] = max(0, min(127, map(analogRead(6), 0, 771, 0, 127)));
+  midiVal[4] = max(0, min(127, map(analogRead(7), 96, 767, 0, 127)));
+  midiVal[5] = (-digitalRead(3)+1)*127; //Math code for turning a 0/1 into a 127/0
+
+  // Check all 6 controllers. Check if any of the values have changed by more than 2.
+  // Checking if it changed by 1 might jitter. And 2 is good enough resolution, so we pick 2.
+  // If a value has changed, send the updated MIDI command value.
+  // Then store the value into Prev value so we don't keep sending the same values.
+  for(int i = 0; i < 6; i++){
+    if(abs(midiVal[i] - midiValPrev[i])>2){
+      SendData(i, midiVal[i]);
+      midiValPrev[i] = midiVal[i];
+    }
+  }
+
+  // Human Sam won't know the difference between 100Hz and 10000Hz so 
+  // why make the Arduino work harder than it needs to? Also less likely
+  // for my serial commands to get clogged up if I mash all the keys. Maybe?
+  delay(10);
+
+}
+
+void SendData(int channel, int value) 
+{
+  // This is all MIDI is. Just bashing out bytes.
+  Serial.write(0xB0);      // This says it's a controller
+  Serial.write(channel+1); // This says which channel we're sending information about.
+                           // My MIDI pad is 0 so I added the +1 in case my software got confused.
+  Serial.write(value);     // The data!
+  //Serial.println("Sending!"); // Sorry if you have to use this
+}
